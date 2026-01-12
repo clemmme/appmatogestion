@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Dossiers from "./pages/Dossiers";
 import Import from "./pages/Import";
+import Branches from "./pages/Branches";
+import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +30,8 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dossiers" element={<Dossiers />} />
               <Route path="/import" element={<Import />} />
+              <Route path="/branches" element={<Branches />} />
+              <Route path="/users" element={<Users />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
