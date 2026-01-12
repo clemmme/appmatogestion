@@ -46,16 +46,16 @@ interface ValidatedRow {
 }
 
 const dbFields = [
-  { value: 'code', label: 'Code dossier' },
-  { value: 'nom', label: 'Nom' },
+  { value: 'nom', label: 'Nom Dossier *' },
   { value: 'siren', label: 'SIREN' },
-  { value: 'forme_juridique', label: 'Forme juridique' },
-  { value: 'regime_fiscal', label: 'Régime fiscal' },
-  { value: 'ca_n1', label: 'CA N-1' },
+  { value: 'forme_juridique', label: 'Forme Juridique' },
+  { value: 'regime_fiscal', label: 'Régime Fiscal (IS/IR)' },
+  { value: 'cloture', label: 'Date Clôture (AAAA-MM-JJ)' },
+  { value: 'code', label: 'Code dossier' },
   { value: 'ignore', label: '— Ignorer —' },
 ];
 
-const TEMPLATE_HEADERS = ['Nom', 'Siren', 'Forme', 'Régime Fiscal', 'CA N-1'];
+const TEMPLATE_HEADERS = ['Nom Dossier', 'Siren', 'Forme Juridique', 'Régime Fiscal', 'Date Clôture'];
 const VALID_FORMES: FormeJuridique[] = ['SAS', 'SARL', 'EURL', 'SA', 'SCI', 'EI', 'SASU', 'SNC', 'AUTRE'];
 const VALID_REGIMES: RegimeFiscal[] = ['IS', 'IR', 'MICRO', 'REEL_SIMPLIFIE', 'REEL_NORMAL'];
 
@@ -89,9 +89,9 @@ export const Import: React.FC = () => {
 
   const downloadTemplate = () => {
     const csvContent = TEMPLATE_HEADERS.join(';') + '\n' +
-      '2R ORANGE;123456789;SAS;IS;150000\n' +
-      'AD2P;987654321;SARL;IR;75000\n' +
-      'EXEMPLE SOCIETE;456789123;EURL;MICRO;45000';
+      '2R ORANGE;123456789;SAS;IS;2025-12-31\n' +
+      'AD2P;987654321;SARL;IR;2025-06-30\n' +
+      'EXEMPLE SOCIETE;456789123;EURL;MICRO;2025-12-31';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -100,7 +100,7 @@ export const Import: React.FC = () => {
     link.download = 'template_dossiers.csv';
     link.click();
     URL.revokeObjectURL(url);
-    toast.success('Modèle téléchargé');
+    toast.success('Modèle CSV téléchargé ! Ouvrez-le avec Excel et remplissez vos données.');
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -132,13 +132,13 @@ export const Import: React.FC = () => {
   }, []);
 
   const guessMapping = (column: string): string | null => {
-    const lower = column.toLowerCase();
+    const lower = column.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (lower.includes('code')) return 'code';
-    if (lower.includes('nom') || lower.includes('name')) return 'nom';
+    if (lower.includes('nom') || lower.includes('name') || lower.includes('dossier')) return 'nom';
     if (lower.includes('siren')) return 'siren';
-    if (lower.includes('forme')) return 'forme_juridique';
-    if (lower.includes('regime') || lower.includes('régime')) return 'regime_fiscal';
-    if (lower.includes('ca')) return 'ca_n1';
+    if (lower.includes('forme') || lower.includes('juridique')) return 'forme_juridique';
+    if (lower.includes('regime') || lower.includes('fiscal')) return 'regime_fiscal';
+    if (lower.includes('cloture') || lower.includes('date')) return 'cloture';
     return null;
   };
 
@@ -170,12 +170,14 @@ export const Import: React.FC = () => {
         data[mapping.dbField] = value;
 
         // Validation rules
-        if (mapping.dbField === 'nom' && !value.trim()) {
-          errors.push({
-            line: rowIndex + 2,
-            column: mapping.csvColumn,
-            message: 'Le nom est obligatoire',
-          });
+        if (mapping.dbField === 'nom') {
+          if (!value.trim()) {
+            errors.push({
+              line: rowIndex + 2,
+              column: mapping.csvColumn,
+              message: 'Le nom du dossier est obligatoire',
+            });
+          }
         }
 
         if (mapping.dbField === 'siren' && value) {
@@ -184,7 +186,7 @@ export const Import: React.FC = () => {
             errors.push({
               line: rowIndex + 2,
               column: mapping.csvColumn,
-              message: 'SIREN invalide (9 chiffres requis)',
+              message: `SIREN invalide "${value}" — 9 chiffres requis`,
             });
           } else {
             data.siren = sirenClean;
@@ -192,12 +194,12 @@ export const Import: React.FC = () => {
         }
 
         if (mapping.dbField === 'forme_juridique' && value) {
-          const normalized = value.toUpperCase();
+          const normalized = value.toUpperCase().trim();
           if (!VALID_FORMES.includes(normalized as FormeJuridique)) {
             errors.push({
               line: rowIndex + 2,
               column: mapping.csvColumn,
-              message: `Forme juridique invalide. Valeurs acceptées: ${VALID_FORMES.join(', ')}`,
+              message: `Forme juridique invalide "${value}". Acceptées: ${VALID_FORMES.join(', ')}`,
             });
           } else {
             data.forme_juridique = normalized;
@@ -205,15 +207,44 @@ export const Import: React.FC = () => {
         }
 
         if (mapping.dbField === 'regime_fiscal' && value) {
-          const normalized = value.toUpperCase().replace(/\s+/g, '_');
+          const normalized = value.toUpperCase().replace(/\s+/g, '_').trim();
           if (!VALID_REGIMES.includes(normalized as RegimeFiscal)) {
             errors.push({
               line: rowIndex + 2,
               column: mapping.csvColumn,
-              message: `Régime fiscal invalide. Valeurs acceptées: ${VALID_REGIMES.join(', ')}`,
+              message: `Régime fiscal invalide "${value}". Acceptés: ${VALID_REGIMES.join(', ')}`,
             });
           } else {
             data.regime_fiscal = normalized;
+          }
+        }
+
+        if (mapping.dbField === 'cloture' && value) {
+          // Accept formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY
+          let dateValue = value.trim();
+          let isValid = false;
+          
+          // Try YYYY-MM-DD format
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            const d = new Date(dateValue);
+            isValid = !isNaN(d.getTime());
+          }
+          // Try DD/MM/YYYY or DD-MM-YYYY format
+          else if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(dateValue)) {
+            const parts = dateValue.split(/[\/\-]/);
+            dateValue = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            const d = new Date(dateValue);
+            isValid = !isNaN(d.getTime());
+          }
+          
+          if (!isValid) {
+            errors.push({
+              line: rowIndex + 2,
+              column: mapping.csvColumn,
+              message: `Date invalide "${value}". Format attendu: AAAA-MM-JJ ou JJ/MM/AAAA`,
+            });
+          } else {
+            data.cloture = dateValue;
           }
         }
       });
@@ -248,6 +279,7 @@ export const Import: React.FC = () => {
           siren: row.data.siren || null,
           forme_juridique: (row.data.forme_juridique as FormeJuridique) || 'AUTRE',
           regime_fiscal: (row.data.regime_fiscal as RegimeFiscal) || 'IS',
+          cloture: row.data.cloture || null,
           tva_mode: 'mensuel',
           branch_id: selectedBranch,
           is_active: true,
@@ -255,6 +287,10 @@ export const Import: React.FC = () => {
 
         if (error) {
           console.error('Insert error:', error);
+          if (error.code === '42501') {
+            toast.error('Erreur : Vous n\'avez pas les droits pour importer des dossiers.');
+            break;
+          }
           errorCount++;
         } else {
           successCount++;
@@ -351,7 +387,8 @@ export const Import: React.FC = () => {
           <CardHeader>
             <CardTitle>Importer un fichier</CardTitle>
             <CardDescription>
-              Glissez-déposez votre fichier CSV ou Excel. Téléchargez d'abord le modèle pour connaître le format attendu.
+              Glissez-déposez votre fichier CSV ou Excel. <strong>Important:</strong> Téléchargez d'abord le modèle 
+              pour connaître le format exact attendu (colonnes, format des dates, etc.)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -381,10 +418,13 @@ export const Import: React.FC = () => {
               </div>
             </div>
 
-            <Alert className="mt-4">
-              <AlertCircle className="h-4 w-4" />
+            <Alert className="mt-4 border-primary/30 bg-primary/5">
+              <AlertCircle className="h-4 w-4 text-primary" />
               <AlertDescription>
-                <strong>Format attendu :</strong> {TEMPLATE_HEADERS.join(', ')}
+                <strong>Colonnes attendues :</strong> {TEMPLATE_HEADERS.join(', ')}<br />
+                <span className="text-sm text-muted-foreground">
+                  Format de date : AAAA-MM-JJ (ex: 2025-12-31) ou JJ/MM/AAAA (ex: 31/12/2025)
+                </span>
               </AlertDescription>
             </Alert>
           </CardContent>

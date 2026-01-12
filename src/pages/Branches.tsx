@@ -70,8 +70,15 @@ export const Branches: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
+    if (!formData.name.trim()) {
+      toast.error('Le nom de l\'établissement est obligatoire');
+      return;
+    }
+    
     if (!organization?.id) {
-      toast.error('Organisation non trouvée');
+      toast.error('Erreur : Organisation non trouvée. Veuillez vous reconnecter.');
       return;
     }
 
@@ -88,9 +95,14 @@ export const Branches: React.FC = () => {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          if (error.code === '42501') {
+            throw new Error('Vous n\'avez pas les droits pour modifier cet établissement. Seuls les Experts peuvent effectuer cette action.');
+          }
+          throw error;
+        }
         setBranches(prev => prev.map(b => b.id === data.id ? data as Branch : b));
-        toast.success('Établissement mis à jour');
+        toast.success('Établissement mis à jour avec succès');
       } else {
         const { data, error } = await supabase
           .from('branches')
@@ -102,30 +114,46 @@ export const Branches: React.FC = () => {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          if (error.code === '42501') {
+            throw new Error('Vous n\'avez pas les droits pour créer un établissement. Seuls les Experts peuvent effectuer cette action.');
+          }
+          if (error.code === '23505') {
+            throw new Error('Un établissement avec ce nom existe déjà.');
+          }
+          throw error;
+        }
         setBranches(prev => [...prev, data as Branch]);
-        toast.success('Établissement créé');
+        toast.success(`Établissement "${data.name}" créé avec succès`);
       }
       setModalOpen(false);
     } catch (error: any) {
       console.error('Error saving branch:', error);
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error(error.message || 'Erreur lors de la sauvegarde de l\'établissement');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet établissement ?')) return;
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cet établissement ? Les dossiers associés seront également affectés.')) return;
 
     try {
       const { error } = await supabase.from('branches').delete().eq('id', id);
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42501') {
+          throw new Error('Vous n\'avez pas les droits pour supprimer cet établissement.');
+        }
+        if (error.code === '23503') {
+          throw new Error('Impossible de supprimer : des dossiers sont encore liés à cet établissement.');
+        }
+        throw error;
+      }
       setBranches(prev => prev.filter(b => b.id !== id));
-      toast.success('Établissement supprimé');
+      toast.success('Établissement supprimé avec succès');
     } catch (error: any) {
       console.error('Error deleting branch:', error);
-      toast.error(error.message || 'Erreur lors de la suppression');
+      toast.error(error.message || 'Erreur lors de la suppression de l\'établissement');
     }
   };
 

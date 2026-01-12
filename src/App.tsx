@@ -12,6 +12,7 @@ import Dossiers from "./pages/Dossiers";
 import Import from "./pages/Import";
 import Branches from "./pages/Branches";
 import Users from "./pages/Users";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/import" element={<Import />} />
               <Route path="/branches" element={<Branches />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
