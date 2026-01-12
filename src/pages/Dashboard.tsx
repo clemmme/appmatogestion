@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, CheckCircle2, AlertCircle, Clock, RefreshCw } from 'lucide-react';
-import type { Dossier, TacheFiscale, TacheType, Branch } from '@/types/database.types';
+import { FolderOpen, CheckCircle2, AlertCircle, Clock, RefreshCw, Users } from 'lucide-react';
+import type { Dossier, TacheFiscale, TacheType, Branch, Profile } from '@/types/database.types';
 import { format, subMonths, addMonths } from 'date-fns';
 
 const generateMonths = (startOffset: number = -2, count: number = 14): string[] => {
@@ -28,31 +28,46 @@ const generateMonths = (startOffset: number = -2, count: number = 14): string[] 
 };
 
 export const Dashboard: React.FC = () => {
-  const { organization, branch, profile } = useAuth();
+  const { organization, userRole, profile } = useAuth();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [taches, setTaches] = useState<TacheFiscale[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [collaborators, setCollaborators] = useState<Profile[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
+  const [selectedCollaborator, setSelectedCollaborator] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [taskType, setTaskType] = useState<TacheType>('TVA');
 
   const months = generateMonths();
+  const isExpert = userRole === 'admin' || userRole === 'manager';
 
   useEffect(() => {
     fetchData();
-  }, [selectedBranch]);
+  }, [selectedBranch, selectedCollaborator]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch branches
-      const { data: branchesData } = await supabase
-        .from('branches')
-        .select('*')
-        .order('name');
+      // Fetch branches (only for experts)
+      if (isExpert) {
+        const { data: branchesData } = await supabase
+          .from('branches')
+          .select('*')
+          .order('name');
 
-      if (branchesData) {
-        setBranches(branchesData as Branch[]);
+        if (branchesData) {
+          setBranches(branchesData as Branch[]);
+        }
+
+        // Fetch collaborators for the filter
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('full_name');
+
+        if (profilesData) {
+          setCollaborators(profilesData as Profile[]);
+        }
       }
 
       // Fetch dossiers
@@ -64,6 +79,11 @@ export const Dashboard: React.FC = () => {
 
       if (selectedBranch !== 'all') {
         dossiersQuery = dossiersQuery.eq('branch_id', selectedBranch);
+      }
+
+      // Filter by collaborator for experts
+      if (isExpert && selectedCollaborator !== 'all') {
+        dossiersQuery = dossiersQuery.eq('manager_id', selectedCollaborator);
       }
 
       const { data: dossiersData } = await dossiersQuery;
@@ -115,26 +135,54 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Tous les établissements" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les établissements</SelectItem>
-              {branches.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Branch filter (Expert only) */}
+          {isExpert && (
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Tous les établissements" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les établissements</SelectItem>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Collaborator filter (Expert only) */}
+          {isExpert && (
+            <Select value={selectedCollaborator} onValueChange={setSelectedCollaborator}>
+              <SelectTrigger className="w-[180px]">
+                <Users className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Tous les collaborateurs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les collaborateurs</SelectItem>
+                {collaborators.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Button variant="outline" size="icon" onClick={fetchData}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
+
+      {/* Role indicator for non-experts */}
+      {!isExpert && (
+        <div className="bg-muted/50 border rounded-lg p-3 text-sm text-muted-foreground">
+          <strong>Vue collaborateur :</strong> Vous voyez uniquement les dossiers qui vous sont assignés.
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
