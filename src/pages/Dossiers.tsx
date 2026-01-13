@@ -145,7 +145,20 @@ export const Dossiers: React.FC = () => {
                 <TableCell className="font-mono text-sm">
                   {dossier.code || '—'}
                 </TableCell>
-                <TableCell className="font-medium">{dossier.nom}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {dossier.nom}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => navigate(`/dossiers/${dossier.id}`)}
+                      title="Ouvrir la feuille de travail"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{dossier.forme_juridique}</Badge>
                 </TableCell>

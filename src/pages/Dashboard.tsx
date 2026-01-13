@@ -5,6 +5,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { UrgentTaskCard } from '@/components/dashboard/UrgentTaskCard';
 import { ProductionDelays } from '@/components/dashboard/ProductionDelays';
 import { CollaboratorProgress } from '@/components/dashboard/CollaboratorProgress';
+import { DossierAccordion } from '@/components/dashboard/DossierAccordion';
 import { TaskModal } from '@/components/dashboard/TaskModal';
 import {
   Select,
@@ -71,7 +72,7 @@ export const Dashboard: React.FC = () => {
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
   const [selectedCollaborator, setSelectedCollaborator] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('TVA');
+  const [activeTab, setActiveTab] = useState<string>('ACCORDION');
   const [selectedTask, setSelectedTask] = useState<{
     dossier: Dossier;
     month: string;
@@ -482,37 +483,56 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Tasks by Type */}
-      <div className="space-y-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="TVA" className="gap-2">
-              <Receipt className="w-4 h-4" />
-              TVA
-            </TabsTrigger>
-            <TabsTrigger value="IS" className="gap-2">
-              <FileText className="w-4 h-4" />
-              IS
-            </TabsTrigger>
-            <TabsTrigger value="TAXES" className="gap-2">
-              <Building2 className="w-4 h-4" />
-              Taxes Annexes
-            </TabsTrigger>
-          </TabsList>
+      {/* Dossiers Accordion View */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FolderOpen className="w-5 h-5" />
+            Vue par dossier
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="ACCORDION" className="gap-2">
+                Vue Accordéon
+              </TabsTrigger>
+              <TabsTrigger value="TVA" className="gap-2">
+                <Receipt className="w-4 h-4" />
+                TVA
+              </TabsTrigger>
+              <TabsTrigger value="IS" className="gap-2">
+                <FileText className="w-4 h-4" />
+                IS
+              </TabsTrigger>
+              <TabsTrigger value="TAXES" className="gap-2">
+                <Building2 className="w-4 h-4" />
+                Taxes Annexes
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="TVA" className="mt-4">
-            {renderTaskTable(['TVA'])}
-          </TabsContent>
+            <TabsContent value="ACCORDION" className="mt-0">
+              <DossierAccordion
+                dossiers={dossiers}
+                taches={taches}
+                onTaskClick={openTaskModal}
+              />
+            </TabsContent>
 
-          <TabsContent value="IS" className="mt-4">
-            {renderTaskTable(['IS'])}
-          </TabsContent>
+            <TabsContent value="TVA" className="mt-0">
+              {renderTaskTable(['TVA'])}
+            </TabsContent>
 
-          <TabsContent value="TAXES" className="mt-4">
-            {renderTaskTable(['CVAE', 'CFE', 'LIASSE'])}
-          </TabsContent>
-        </Tabs>
-      </div>
+            <TabsContent value="IS" className="mt-0">
+              {renderTaskTable(['IS'])}
+            </TabsContent>
+
+            <TabsContent value="TAXES" className="mt-0">
+              {renderTaskTable(['CVAE', 'CFE', 'LIASSE'])}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Task Modal */}
       {selectedTask && (

@@ -47,6 +47,7 @@ export const DossierModal: React.FC<DossierModalProps> = ({
     forme_juridique: 'SARL' as FormeJuridique,
     regime_fiscal: 'IS' as RegimeFiscal,
     tva_mode: 'mensuel' as TvaMode,
+    tva_deadline_day: 21,
     cloture: '',
     branch_id: '',
   });
@@ -60,6 +61,7 @@ export const DossierModal: React.FC<DossierModalProps> = ({
         forme_juridique: dossier.forme_juridique,
         regime_fiscal: dossier.regime_fiscal,
         tva_mode: dossier.tva_mode,
+        tva_deadline_day: (dossier as any).tva_deadline_day || 21,
         cloture: dossier.cloture || '',
         branch_id: dossier.branch_id,
       });
@@ -71,6 +73,7 @@ export const DossierModal: React.FC<DossierModalProps> = ({
         forme_juridique: 'SARL',
         regime_fiscal: 'IS',
         tva_mode: 'mensuel',
+        tva_deadline_day: 21,
         cloture: '',
         branch_id: branches[0]?.id || '',
       });
@@ -89,6 +92,7 @@ export const DossierModal: React.FC<DossierModalProps> = ({
         forme_juridique: formData.forme_juridique,
         regime_fiscal: formData.regime_fiscal,
         tva_mode: formData.tva_mode,
+        tva_deadline_day: formData.tva_deadline_day,
         cloture: formData.cloture || null,
         branch_id: formData.branch_id,
       };
@@ -201,7 +205,7 @@ export const DossierModal: React.FC<DossierModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Mode TVA</Label>
               <Select
@@ -214,6 +218,24 @@ export const DossierModal: React.FC<DossierModalProps> = ({
                 <SelectContent>
                   <SelectItem value="mensuel">Mensuel</SelectItem>
                   <SelectItem value="trimestriel">Trimestriel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Jour limite TVA</Label>
+              <Select
+                value={String(formData.tva_deadline_day)}
+                onValueChange={(v) => setFormData({ ...formData, tva_deadline_day: Number(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].map((day) => (
+                    <SelectItem key={day} value={String(day)}>
+                      Le {day}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

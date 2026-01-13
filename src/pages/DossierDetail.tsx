@@ -26,6 +26,15 @@ const MONTHS = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
 ];
 
+// IS has 5 specific periods, not 12 months
+const IS_PERIODS = [
+  { key: 'acompte1', label: 'Acompte 1', month: 3 },
+  { key: 'acompte2', label: 'Acompte 2', month: 6 },
+  { key: 'acompte3', label: 'Acompte 3', month: 9 },
+  { key: 'acompte4', label: 'Acompte 4', month: 12 },
+  { key: 'solde', label: 'Solde IS', month: 5 },
+];
+
 const TASK_TYPES: TacheType[] = ['TVA', 'IS', 'CFE', 'CVAE', 'LIASSE'];
 
 const STATUS_OPTIONS: { value: TacheStatut; label: string; color: string }[] = [
@@ -46,9 +55,10 @@ export const DossierDetail: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [pendingChanges, setPendingChanges] = useState<Map<string, { montant?: number; statut?: TacheStatut }>>(new Map());
 
+  // Extended year range to allow historical data entry
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    return [currentYear - 1, currentYear, currentYear + 1];
+    return [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
   }, []);
 
   useEffect(() => {
@@ -233,17 +243,20 @@ export const DossierDetail: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-            <SelectTrigger className="w-[120px]">
-              <Calendar className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(year => (
-                <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Prominent year selector */}
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            {years.map(year => (
+              <Button
+                key={year}
+                variant={selectedYear === year ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setSelectedYear(year)}
+                className="min-w-[60px]"
+              >
+                {year}
+              </Button>
+            ))}
+          </div>
 
           <Button onClick={saveChanges} disabled={saving || pendingChanges.size === 0}>
             <Save className="w-4 h-4 mr-2" />
@@ -259,53 +272,114 @@ export const DossierDetail: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[1000px]">
+            {/* TVA Grid - Monthly */}
+            <h3 className="text-sm font-semibold text-muted-foreground mb-2">TVA (Mensuel/Trimestriel)</h3>
+            <table className="w-full border-collapse mb-6">
               <thead>
                 <tr className="bg-muted/50">
                   <th className="text-left px-3 py-2 text-sm font-medium text-muted-foreground border-b sticky left-0 bg-muted/50 z-10 min-w-[80px]">
                     Période
                   </th>
-                  {TASK_TYPES.map(type => (
-                    <th key={type} colSpan={2} className="text-center px-2 py-2 text-sm font-medium border-b border-l">
-                      {type}
-                    </th>
-                  ))}
-                </tr>
-                <tr className="bg-muted/30">
-                  <th className="border-b sticky left-0 bg-muted/30 z-10"></th>
-                  {TASK_TYPES.map(type => (
-                    <React.Fragment key={`${type}-headers`}>
-                      <th className="text-center px-1 py-1 text-xs text-muted-foreground border-b border-l">Montant</th>
-                      <th className="text-center px-1 py-1 text-xs text-muted-foreground border-b">Statut</th>
-                    </React.Fragment>
-                  ))}
+                  <th className="text-center px-2 py-2 text-sm font-medium border-b border-l">Montant</th>
+                  <th className="text-center px-2 py-2 text-sm font-medium border-b">Statut</th>
                 </tr>
               </thead>
               <tbody>
                 {MONTHS.map((monthName, idx) => {
                   const monthNum = idx + 1;
                   const monthKey = `${selectedYear}-${String(monthNum).padStart(2, '0')}`;
+                  const task = taskMatrix['TVA']?.[monthKey];
+                  const cellStyle = getCellStyle(task);
                   
                   return (
                     <tr key={monthKey} className="hover:bg-muted/30 transition-colors">
                       <td className="px-3 py-2 font-medium text-sm border-b sticky left-0 bg-card z-10">
-                        {monthName.substring(0, 3)}
+                        {monthName}
                       </td>
-                      {TASK_TYPES.map(type => {
-                        const task = taskMatrix[type]?.[monthKey];
-                        const cellStyle = getCellStyle(task);
+                      <td className={cn('border-b border-l p-1', cellStyle)}>
+                        <Input
+                          type="number"
+                          placeholder="—"
+                          className="h-8 text-sm text-center w-[120px]"
+                          value={task?.montant || ''}
+                          onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : 0;
+                            handleCellChange(task?.id || null, 'TVA', monthKey, 'montant', val);
+                          }}
+                          disabled={!task}
+                        />
+                      </td>
+                      <td className={cn('border-b p-1', cellStyle)}>
+                        <Select
+                          value={task?.statut || ''}
+                          onValueChange={(v) => handleCellChange(task?.id || null, 'TVA', monthKey, 'statut', v as TacheStatut)}
+                          disabled={!task}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[100px]">
+                            <SelectValue placeholder="—" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                <span className={cn('px-1.5 py-0.5 rounded text-xs', opt.color)}>
+                                  {opt.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* IS Grid - 5 periods only */}
+            {dossier.regime_fiscal === 'IS' && (
+              <>
+                <h3 className="text-sm font-semibold text-muted-foreground mb-2">Impôt sur les Sociétés (IS)</h3>
+                <table className="w-full border-collapse mb-6">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left px-3 py-2 text-sm font-medium text-muted-foreground border-b min-w-[150px]">
+                        Échéance
+                      </th>
+                      <th className="text-center px-2 py-2 text-sm font-medium border-b border-l">Montant</th>
+                      <th className="text-center px-2 py-2 text-sm font-medium border-b">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      // Find all IS tasks for this year
+                      const isTasks = taches.filter(t => t.type === 'IS');
+                      
+                      return IS_PERIODS.map((period) => {
+                        // Match task by commentaire containing the period label
+                        const task = isTasks.find(t => 
+                          t.commentaire?.includes(period.label.replace('Acompte ', 'Acompte IS ')) ||
+                          t.commentaire?.includes(period.label)
+                        );
+                        const cellStyle = getCellStyle(task || null);
                         
                         return (
-                          <React.Fragment key={`${type}-${monthKey}`}>
+                          <tr key={period.key} className="hover:bg-muted/30 transition-colors">
+                            <td className="px-3 py-2 font-medium text-sm border-b">
+                              {period.label}
+                              <span className="text-xs text-muted-foreground ml-2">
+                                (15/{String(period.month).padStart(2, '0')})
+                              </span>
+                            </td>
                             <td className={cn('border-b border-l p-1', cellStyle)}>
                               <Input
                                 type="number"
                                 placeholder="—"
-                                className="h-8 text-sm text-center w-[80px]"
+                                className="h-8 text-sm text-center w-[120px]"
                                 value={task?.montant || ''}
                                 onChange={(e) => {
+                                  if (!task) return;
                                   const val = e.target.value ? Number(e.target.value) : 0;
-                                  handleCellChange(task?.id || null, type, monthKey, 'montant', val);
+                                  handleCellChange(task.id, 'IS', '', 'montant', val);
                                 }}
                                 disabled={!task}
                               />
@@ -313,10 +387,13 @@ export const DossierDetail: React.FC = () => {
                             <td className={cn('border-b p-1', cellStyle)}>
                               <Select
                                 value={task?.statut || ''}
-                                onValueChange={(v) => handleCellChange(task?.id || null, type, monthKey, 'statut', v as TacheStatut)}
+                                onValueChange={(v) => {
+                                  if (!task) return;
+                                  handleCellChange(task.id, 'IS', '', 'statut', v as TacheStatut);
+                                }}
                                 disabled={!task}
                               >
-                                <SelectTrigger className="h-8 text-xs w-[90px]">
+                                <SelectTrigger className="h-8 text-xs w-[100px]">
                                   <SelectValue placeholder="—" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -330,9 +407,79 @@ export const DossierDetail: React.FC = () => {
                                 </SelectContent>
                               </Select>
                             </td>
-                          </React.Fragment>
+                          </tr>
                         );
-                      })}
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {/* Other taxes (CFE, CVAE, LIASSE) */}
+            <h3 className="text-sm font-semibold text-muted-foreground mb-2">Autres obligations</h3>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="text-left px-3 py-2 text-sm font-medium text-muted-foreground border-b min-w-[150px]">
+                    Obligation
+                  </th>
+                  <th className="text-center px-2 py-2 text-sm font-medium border-b border-l">Montant</th>
+                  <th className="text-center px-2 py-2 text-sm font-medium border-b">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(['CFE', 'CVAE', 'LIASSE'] as TacheType[]).map((type) => {
+                  const task = taches.find(t => t.type === type);
+                  const cellStyle = getCellStyle(task || null);
+                  
+                  return (
+                    <tr key={type} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-3 py-2 font-medium text-sm border-b">
+                        {type === 'LIASSE' ? 'Bilan / Liasse Fiscale' : type}
+                        {task && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            (Échéance: {format(parseISO(task.date_echeance), 'd MMM yyyy', { locale: fr })})
+                          </span>
+                        )}
+                      </td>
+                      <td className={cn('border-b border-l p-1', cellStyle)}>
+                        <Input
+                          type="number"
+                          placeholder="—"
+                          className="h-8 text-sm text-center w-[120px]"
+                          value={task?.montant || ''}
+                          onChange={(e) => {
+                            if (!task) return;
+                            const val = e.target.value ? Number(e.target.value) : 0;
+                            handleCellChange(task.id, type, '', 'montant', val);
+                          }}
+                          disabled={!task}
+                        />
+                      </td>
+                      <td className={cn('border-b p-1', cellStyle)}>
+                        <Select
+                          value={task?.statut || ''}
+                          onValueChange={(v) => {
+                            if (!task) return;
+                            handleCellChange(task.id, type, '', 'statut', v as TacheStatut);
+                          }}
+                          disabled={!task}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[100px]">
+                            <SelectValue placeholder="—" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                <span className={cn('px-1.5 py-0.5 rounded text-xs', opt.color)}>
+                                  {opt.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
                     </tr>
                   );
                 })}

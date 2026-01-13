@@ -63,6 +63,7 @@ export type Database = {
           notes: string | null
           regime_fiscal: Database["public"]["Enums"]["regime_fiscal"] | null
           siren: string | null
+          tva_deadline_day: number
           tva_mode: Database["public"]["Enums"]["tva_mode"] | null
           updated_at: string
         }
@@ -81,6 +82,7 @@ export type Database = {
           notes?: string | null
           regime_fiscal?: Database["public"]["Enums"]["regime_fiscal"] | null
           siren?: string | null
+          tva_deadline_day?: number
           tva_mode?: Database["public"]["Enums"]["tva_mode"] | null
           updated_at?: string
         }
@@ -99,6 +101,7 @@ export type Database = {
           notes?: string | null
           regime_fiscal?: Database["public"]["Enums"]["regime_fiscal"] | null
           siren?: string | null
+          tva_deadline_day?: number
           tva_mode?: Database["public"]["Enums"]["tva_mode"] | null
           updated_at?: string
         }
