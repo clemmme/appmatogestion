@@ -2,12 +2,14 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { PricingSection } from '@/components/landing/PricingSection';
+import { Footer } from '@/components/landing/Footer';
+import { CookieBanner } from '@/components/landing/CookieBanner';
 import { 
   ArrowRight, 
   Clock, 
   Bell, 
   Users, 
-  BarChart3,
   CheckCircle,
   Shield
 } from 'lucide-react';
@@ -46,6 +48,10 @@ const Index: React.FC = () => {
     { value: '15h', label: 'Gagnées par mois' },
   ];
 
+  const scrollToPricing = () => {
+    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Navigation */}
@@ -56,6 +62,14 @@ const Index: React.FC = () => {
               <span className="text-lg font-bold text-primary-foreground">A</span>
             </div>
             <span className="font-semibold text-lg">APPMATO</span>
+          </div>
+          <div className="hidden md:flex items-center gap-6">
+            <button 
+              onClick={scrollToPricing} 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Tarifs
+            </button>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/auth')}>
@@ -100,10 +114,10 @@ const Index: React.FC = () => {
                 <Button 
                   size="lg" 
                   variant="outline" 
-                  onClick={() => navigate('/auth')}
+                  onClick={scrollToPricing}
                   className="rounded-full px-8 h-14 text-base"
                 >
-                  Se connecter
+                  Voir les tarifs
                 </Button>
               </div>
 
@@ -219,6 +233,9 @@ const Index: React.FC = () => {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <PricingSection />
+
       {/* CTA Section */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto">
@@ -246,19 +263,10 @@ const Index: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-12 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl gradient-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">A</span>
-            </div>
-            <span className="font-semibold">APPMATO GESTION</span>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} APPMATO GESTION. Tous droits réservés.
-          </p>
-        </div>
-      </footer>
+      <Footer />
+
+      {/* Cookie Banner */}
+      <CookieBanner />
     </div>
   );
 };
