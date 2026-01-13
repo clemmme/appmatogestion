@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users as UsersIcon, Shield, User, Loader2 } from 'lucide-react';
+import { Plus, Users as UsersIcon, Shield, User, Loader2, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Profile, Branch, AppRole } from '@/types/database.types';
 
@@ -119,7 +119,7 @@ export const Users: React.FC = () => {
 
     setSaving(true);
     try {
-      // Create profile for the invited user (they will need to sign up with this email)
+      // Create profile for the invited user
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -133,7 +133,22 @@ export const Users: React.FC = () => {
 
       if (profileError) throw profileError;
 
-      toast.success(`Invitation envoyée à ${inviteData.email}`);
+      // Create invitation token
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('invitation_tokens')
+        .insert({ profile_id: profile.id })
+        .select('token')
+        .single();
+
+      if (tokenError) throw tokenError;
+
+      // Generate the invitation link
+      const inviteLink = `${window.location.origin}/join?token=${tokenData.token}`;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(inviteLink);
+      
+      toast.success('Lien copié! Envoyez-le à votre collaborateur.', { duration: 5000 });
       setMembers(prev => [...prev, { ...profile, role: inviteData.role } as TeamMember]);
       setInviteModalOpen(false);
       setInviteData({
@@ -261,9 +276,9 @@ export const Users: React.FC = () => {
       <Dialog open={inviteModalOpen} onOpenChange={setInviteModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Inviter un collaborateur</DialogTitle>
+            <DialogTitle>Générer un lien d'invitation</DialogTitle>
             <DialogDescription>
-              Le collaborateur recevra un email pour créer son compte.
+              Un lien unique sera généré. Copiez-le et envoyez-le par email ou WhatsApp.
             </DialogDescription>
           </DialogHeader>
 
@@ -334,8 +349,12 @@ export const Users: React.FC = () => {
                 Annuler
               </Button>
               <Button type="submit" disabled={saving || !inviteData.full_name.trim() || !inviteData.email.trim()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Envoyer l'invitation
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Link2 className="mr-2 h-4 w-4" />
+                )}
+                Générer le lien
               </Button>
             </DialogFooter>
           </form>
