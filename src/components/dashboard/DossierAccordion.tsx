@@ -8,9 +8,9 @@ import {
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileSpreadsheet, AlertCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, AlertCircle, Clock, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import type { Dossier, TacheFiscale } from '@/types/database.types';
-import { format, parseISO, differenceInDays, isBefore } from 'date-fns';
+import { format, parseISO, differenceInDays, isBefore, endOfMonth, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -18,38 +18,88 @@ interface DossierAccordionProps {
   dossiers: Dossier[];
   taches: TacheFiscale[];
   onTaskClick: (task: TacheFiscale) => void;
+  showFutureTasks?: boolean;
 }
+
+/**
+ * Visibility rules for tasks:
+ * - TVA: Show only when today > last day of the period month
+ *   (e.g., TVA January shows from February 1st)
+ * - IS: Show when today >= due date - 30 days
+ *   (e.g., IS due June 15 shows from May 16)
+ */
+const isTaskVisible = (task: TacheFiscale): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDate = parseISO(task.date_echeance);
+
+  // Already completed tasks are always visible
+  if (task.statut === 'fait' || task.statut === 'neant') {
+    return true;
+  }
+
+  if (task.type === 'TVA') {
+    // TVA logic: visible only after the period month ends
+    // The due date is in month M+1, so the period is M
+    // We show the task when today > last day of month M-1 (i.e., we're in or past month M)
+    const periodMonth = new Date(dueDate);
+    periodMonth.setMonth(periodMonth.getMonth() - 1); // Go back to the period month
+    const lastDayOfPeriod = endOfMonth(periodMonth);
+    return isBefore(lastDayOfPeriod, today);
+  }
+
+  if (task.type === 'IS') {
+    // IS logic: visible when today >= due date - 30 days
+    const visibilityDate = subDays(dueDate, 30);
+    return today >= visibilityDate;
+  }
+
+  // Other taxes (CFE, CVAE, LIASSE): visible when today >= due date - 30 days
+  const visibilityDate = subDays(dueDate, 30);
+  return today >= visibilityDate;
+};
 
 export const DossierAccordion: React.FC<DossierAccordionProps> = ({
   dossiers,
   taches,
   onTaskClick,
+  showFutureTasks = false,
 }) => {
   const navigate = useNavigate();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Group tasks by dossier
+  // Group tasks by dossier, applying visibility filter
   const dossierTasksMap = React.useMemo(() => {
-    const map = new Map<string, TacheFiscale[]>();
+    const map = new Map<string, { visible: TacheFiscale[]; future: TacheFiscale[] }>();
     taches.forEach((task) => {
-      const existing = map.get(task.dossier_id) || [];
-      existing.push(task);
-      map.set(task.dossier_id, existing);
+      const dossierId = task.dossier_id;
+      const existing = map.get(dossierId) || { visible: [], future: [] };
+      
+      if (isTaskVisible(task)) {
+        existing.visible.push(task);
+      } else {
+        existing.future.push(task);
+      }
+      
+      map.set(dossierId, existing);
     });
     return map;
   }, [taches]);
 
   const getTaskStats = (dossierId: string) => {
-    const tasks = dossierTasksMap.get(dossierId) || [];
+    const taskData = dossierTasksMap.get(dossierId) || { visible: [], future: [] };
+    const tasks = showFutureTasks ? [...taskData.visible, ...taskData.future] : taskData.visible;
+    
     const pending = tasks.filter((t) => t.statut === 'a_faire' || t.statut === 'retard');
     const late = tasks.filter((t) => {
       if (t.statut === 'fait' || t.statut === 'neant') return false;
       return isBefore(parseISO(t.date_echeance), today);
     });
     const done = tasks.filter((t) => t.statut === 'fait');
+    const futureCount = taskData.future.length;
 
-    return { total: tasks.length, pending: pending.length, late: late.length, done: done.length };
+    return { total: tasks.length, pending: pending.length, late: late.length, done: done.length, future: futureCount };
   };
 
   const getUrgencyStyle = (stats: { late: number }) => {
@@ -68,7 +118,7 @@ export const DossierAccordion: React.FC<DossierAccordionProps> = ({
       if (statsA.late === 0 && statsB.late > 0) return 1;
       return a.nom.localeCompare(b.nom);
     });
-  }, [dossiers, dossierTasksMap]);
+  }, [dossiers, dossierTasksMap, showFutureTasks]);
 
   if (sortedDossiers.length === 0) {
     return (
@@ -83,10 +133,11 @@ export const DossierAccordion: React.FC<DossierAccordionProps> = ({
     <Accordion type="multiple" className="space-y-2">
       {sortedDossiers.map((dossier) => {
         const stats = getTaskStats(dossier.id);
-        const tasks = dossierTasksMap.get(dossier.id) || [];
+        const taskData = dossierTasksMap.get(dossier.id) || { visible: [], future: [] };
+        const tasksToShow = showFutureTasks ? [...taskData.visible, ...taskData.future] : taskData.visible;
         
         // Filter and sort pending tasks by due date
-        const pendingTasks = tasks
+        const pendingTasks = tasksToShow
           .filter((t) => t.statut !== 'fait' && t.statut !== 'neant')
           .sort((a, b) => new Date(a.date_echeance).getTime() - new Date(b.date_echeance).getTime());
 
@@ -165,6 +216,7 @@ export const DossierAccordion: React.FC<DossierAccordionProps> = ({
                       const daysUntilDue = differenceInDays(dueDate, today);
                       const isLate = daysUntilDue < 0;
                       const isUrgent = daysUntilDue >= 0 && daysUntilDue <= 5;
+                      const isFuture = !isTaskVisible(task);
 
                       return (
                         <div
@@ -174,18 +226,28 @@ export const DossierAccordion: React.FC<DossierAccordionProps> = ({
                             'flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors',
                             isLate && 'bg-status-urgent/10 border-status-urgent/30 hover:bg-status-urgent/15',
                             isUrgent && !isLate && 'bg-orange-500/10 border-orange-500/30 hover:bg-orange-500/15',
-                            !isLate && !isUrgent && 'hover:bg-muted'
+                            isFuture && 'bg-muted/30 border-dashed opacity-60',
+                            !isLate && !isUrgent && !isFuture && 'hover:bg-muted'
                           )}
                         >
                           <div className="flex items-center gap-3">
-                            <Badge variant="outline">{task.type}</Badge>
+                            <Badge variant={isFuture ? "outline" : "default"} className={isFuture ? "opacity-50" : ""}>
+                              {task.type}
+                            </Badge>
                             <span className="text-sm">{task.commentaire || task.type}</span>
+                            {isFuture && (
+                              <Badge variant="outline" className="text-xs bg-muted">
+                                <EyeOff className="w-3 h-3 mr-1" />
+                                Prévisionnel
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
                             <span className={cn(
                               'text-sm',
                               isLate && 'text-status-urgent font-semibold',
-                              isUrgent && !isLate && 'text-orange-500 font-medium'
+                              isUrgent && !isLate && 'text-orange-500 font-medium',
+                              isFuture && 'text-muted-foreground'
                             )}>
                               {isLate
                                 ? `${Math.abs(daysUntilDue)}j de retard`
@@ -196,13 +258,25 @@ export const DossierAccordion: React.FC<DossierAccordionProps> = ({
                             <span className="text-sm text-muted-foreground">
                               {format(dueDate, 'd MMM', { locale: fr })}
                             </span>
-                            <Button size="sm" variant="secondary">
-                              Déclarer
-                            </Button>
+                            {!isFuture && (
+                              <Button size="sm" variant="secondary">
+                                Déclarer
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Future tasks indicator */}
+                {!showFutureTasks && stats.future > 0 && (
+                  <div className="mt-3 pt-3 border-t border-dashed">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <EyeOff className="w-3 h-3" />
+                      {stats.future} tâche{stats.future > 1 ? 's' : ''} prévisionnelle{stats.future > 1 ? 's' : ''} masquée{stats.future > 1 ? 's' : ''}
+                    </p>
                   </div>
                 )}
               </div>

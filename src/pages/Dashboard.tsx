@@ -28,10 +28,12 @@ import {
   FileText,
   Building2,
   Landmark,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import type { Dossier, TacheFiscale, TacheType, Branch, Profile } from '@/types/database.types';
-import { format, parseISO, differenceInDays, isBefore, addDays } from 'date-fns';
+import { format, parseISO, differenceInDays, isBefore, addDays, endOfMonth, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -73,6 +75,7 @@ export const Dashboard: React.FC = () => {
   const [selectedCollaborator, setSelectedCollaborator] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('ACCORDION');
+  const [showFutureTasks, setShowFutureTasks] = useState(false);
   const [selectedTask, setSelectedTask] = useState<{
     dossier: Dossier;
     month: string;
@@ -486,10 +489,30 @@ export const Dashboard: React.FC = () => {
       {/* Dossiers Accordion View */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FolderOpen className="w-5 h-5" />
-            Vue par dossier
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" />
+              Vue par dossier
+            </CardTitle>
+            <Button
+              variant={showFutureTasks ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowFutureTasks(!showFutureTasks)}
+              className="gap-2"
+            >
+              {showFutureTasks ? (
+                <>
+                  <EyeOff className="w-4 h-4" />
+                  Masquer le prévisionnel
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4" />
+                  Voir le prévisionnel
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -516,6 +539,7 @@ export const Dashboard: React.FC = () => {
                 dossiers={dossiers}
                 taches={taches}
                 onTaskClick={openTaskModal}
+                showFutureTasks={showFutureTasks}
               />
             </TabsContent>
 
