@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { UrgentTaskCard } from '@/components/dashboard/UrgentTaskCard';
+import { ProductionDelays } from '@/components/dashboard/ProductionDelays';
+import { CollaboratorProgress } from '@/components/dashboard/CollaboratorProgress';
 import { TaskModal } from '@/components/dashboard/TaskModal';
 import {
   Select,
@@ -14,7 +16,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   FolderOpen, 
   CheckCircle2, 
@@ -29,7 +30,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import type { Dossier, TacheFiscale, TacheType, Branch, Profile } from '@/types/database.types';
-import { format, parseISO, differenceInDays, isAfter, isBefore, addDays } from 'date-fns';
+import { format, parseISO, differenceInDays, isBefore, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +45,7 @@ const getTaskUrgency = (task: TacheFiscale): UrgencyLevel => {
   const daysUntilDue = differenceInDays(dueDate, today);
   
   if (daysUntilDue < 0) return 'late';
-  if (daysUntilDue <= 7) return 'urgent';
+  if (daysUntilDue <= 5) return 'urgent';
   return 'soon';
 };
 
@@ -55,13 +56,10 @@ const urgencyRowStyles: Record<UrgencyLevel, string> = {
   done: 'bg-status-done/5 hover:bg-status-done/10',
 };
 
-const taskTypeConfig: Record<TacheType, { icon: React.ElementType; label: string; filter: TacheType[] }> = {
+const taskTypeConfig: Record<string, { icon: React.ElementType; label: string; filter: TacheType[] }> = {
   TVA: { icon: Receipt, label: 'TVA', filter: ['TVA'] },
   IS: { icon: FileText, label: 'IS', filter: ['IS'] },
-  CVAE: { icon: Building2, label: 'Taxes Annexes', filter: ['CVAE', 'CFE'] },
-  CFE: { icon: Landmark, label: 'CFE', filter: ['CFE'] },
-  LIASSE: { icon: FileText, label: 'Liasses', filter: ['LIASSE'] },
-  AUTRE: { icon: FileText, label: 'Autre', filter: ['AUTRE'] },
+  TAXES: { icon: Building2, label: 'Taxes Annexes', filter: ['CVAE', 'CFE', 'LIASSE'] },
 };
 
 export const Dashboard: React.FC = () => {
@@ -153,44 +151,56 @@ export const Dashboard: React.FC = () => {
     setSelectedTask(null);
   };
 
-  // Create dossier map for quick lookup
   const dossierMap = useMemo(() => {
     return new Map(dossiers.map(d => [d.id, d]));
   }, [dossiers]);
 
-  // Filter and sort tasks by urgency
   const getFilteredTasks = (types: TacheType[]) => {
     const dossierIds = new Set(dossiers.map(d => d.id));
     return taches
       .filter(t => types.includes(t.type) && dossierIds.has(t.dossier_id))
       .sort((a, b) => {
-        // Done tasks go to the bottom
         if (a.statut === 'fait' && b.statut !== 'fait') return 1;
         if (a.statut !== 'fait' && b.statut === 'fait') return -1;
-        // Then sort by date
         return new Date(a.date_echeance).getTime() - new Date(b.date_echeance).getTime();
       });
   };
 
-  // Get urgent tasks (late or due within 7 days)
-  const urgentTasks = useMemo(() => {
+  // Get LATE tasks (deadline passed and not done) - CRITICAL
+  const lateTasks = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const urgentDeadline = addDays(today, 7);
     const dossierIds = new Set(dossiers.map(d => d.id));
 
     return taches
       .filter(t => {
         if (!dossierIds.has(t.dossier_id)) return false;
-        if (t.statut === 'fait') return false;
+        if (t.statut === 'fait' || t.statut === 'neant') return false;
         const dueDate = parseISO(t.date_echeance);
-        return isBefore(dueDate, urgentDeadline) || isBefore(dueDate, today);
+        return isBefore(dueDate, today);
+      })
+      .sort((a, b) => new Date(a.date_echeance).getTime() - new Date(b.date_echeance).getTime());
+  }, [taches, dossiers]);
+
+  // Get URGENT tasks (due within 5 days, not late)
+  const urgentTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const urgentDeadline = addDays(today, 5);
+    const dossierIds = new Set(dossiers.map(d => d.id));
+
+    return taches
+      .filter(t => {
+        if (!dossierIds.has(t.dossier_id)) return false;
+        if (t.statut === 'fait' || t.statut === 'neant') return false;
+        const dueDate = parseISO(t.date_echeance);
+        // Not late but within 5 days
+        return !isBefore(dueDate, today) && isBefore(dueDate, urgentDeadline);
       })
       .sort((a, b) => new Date(a.date_echeance).getTime() - new Date(b.date_echeance).getTime())
       .slice(0, 6);
   }, [taches, dossiers]);
 
-  // Calculate stats
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -204,13 +214,12 @@ export const Dashboard: React.FC = () => {
       activeDossiers: dossiers.length,
       completed: currentMonthTasks.filter(t => t.statut === 'fait').length,
       pending: currentMonthTasks.filter(t => t.statut === 'a_faire').length,
-      late: relevantTasks.filter(t => {
-        if (t.statut === 'fait') return false;
-        return isBefore(parseISO(t.date_echeance), today);
-      }).length,
+      late: lateTasks.length,
       total: currentMonthTasks.length,
     };
-  }, [taches, dossiers]);
+  }, [taches, dossiers, lateTasks]);
+
+  const currentMonth = format(new Date(), 'yyyy-MM');
 
   const openTaskModal = (task: TacheFiscale) => {
     const dossier = dossierMap.get(task.dossier_id);
@@ -232,6 +241,7 @@ export const Dashboard: React.FC = () => {
         <div className="text-center py-12 text-muted-foreground">
           <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>Aucune tâche à afficher</p>
+          <p className="text-sm mt-2">Créez un dossier pour générer automatiquement les obligations fiscales</p>
         </div>
       );
     }
@@ -348,7 +358,7 @@ export const Dashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold">Tableau de bord</h1>
           <p className="text-muted-foreground">
-            {organization?.name || 'Votre cabinet'} • Vue intelligente par urgence
+            {organization?.name || 'Votre cabinet'} • {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>
 
@@ -420,13 +430,30 @@ export const Dashboard: React.FC = () => {
         />
       </div>
 
+      {/* Production Delays Alert - Top Priority */}
+      <ProductionDelays
+        lateTasks={lateTasks}
+        dossierMap={dossierMap}
+        onTaskClick={openTaskModal}
+      />
+
+      {/* Expert View: Collaborator Progress */}
+      {isExpert && collaborators.length > 0 && (
+        <CollaboratorProgress
+          collaborators={collaborators}
+          taches={taches}
+          dossiers={dossiers}
+          currentMonth={currentMonth}
+        />
+      )}
+
       {/* Urgent Tasks Cards */}
       {urgentTasks.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-500" />
-              Échéances urgentes
+              Échéances urgentes (5 jours)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -478,11 +505,11 @@ export const Dashboard: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="IS" className="mt-4">
-            {renderTaskTable(['IS', 'LIASSE'])}
+            {renderTaskTable(['IS'])}
           </TabsContent>
 
           <TabsContent value="TAXES" className="mt-4">
-            {renderTaskTable(['CVAE', 'CFE', 'AUTRE'])}
+            {renderTaskTable(['CVAE', 'CFE', 'LIASSE'])}
           </TabsContent>
         </Tabs>
       </div>

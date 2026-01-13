@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,17 +12,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Trash2, FileSpreadsheet } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import type { Dossier, Branch } from '@/types/database.types';
 import { DossierModal } from '@/components/dossiers/DossierModal';
 
 export const Dossiers: React.FC = () => {
+  const navigate = useNavigate();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +171,11 @@ export const Dossiers: React.FC = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => navigate(`/dossiers/${dossier.id}`)}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Fiche de travail
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleEdit(dossier)}>
                         <Edit className="w-4 h-4 mr-2" />
                         Modifier
