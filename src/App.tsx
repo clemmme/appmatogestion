@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Dossiers from "./pages/Dossiers";
+import DossierDetail from "./pages/DossierDetail";
 import Import from "./pages/Import";
 import ImportData from "./pages/ImportData";
 import JoinInvitation from "./pages/JoinInvitation";
@@ -39,6 +40,7 @@ const App = () => (
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dossiers" element={<Dossiers />} />
+                <Route path="/dossiers/:id" element={<DossierDetail />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/import-data" element={<ImportData />} />
                 <Route path="/branches" element={<Branches />} />
