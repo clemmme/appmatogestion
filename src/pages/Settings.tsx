@@ -68,6 +68,8 @@ export const Settings: React.FC = () => {
     email: '',
   });
 
+  // UI-only check - Authorization enforced server-side via RLS policies
+  // This controls UI visibility only; database operations are protected by has_role() in RLS
   const isExpert = userRole === 'admin' || userRole === 'manager';
 
   useEffect(() => {

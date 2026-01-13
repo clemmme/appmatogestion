@@ -50,6 +50,8 @@ export const Users: React.FC = () => {
     branch_id: '',
   });
 
+  // UI-only check - Authorization enforced server-side via RLS policies
+  // This controls UI visibility only; database operations are protected by has_role() in RLS
   const isAdmin = userRole === 'admin';
 
   useEffect(() => {
