@@ -59,6 +59,19 @@ const TEMPLATE_HEADERS = ['Nom Dossier', 'Siren', 'Forme Juridique', 'Régime Fi
 const VALID_FORMES: FormeJuridique[] = ['SAS', 'SARL', 'EURL', 'SA', 'SCI', 'EI', 'SASU', 'SNC', 'AUTRE'];
 const VALID_REGIMES: RegimeFiscal[] = ['IS', 'IR', 'MICRO', 'REEL_SIMPLIFIE', 'REEL_NORMAL'];
 
+// Security: Sanitize CSV formula characters to prevent CSV injection attacks
+// These characters (=, +, -, @) can be interpreted as formulas in Excel
+const sanitizeFormulaChars = (value: string): string => {
+  if (!value) return value;
+  const trimmed = value.trim();
+  // Recursively strip leading formula characters
+  let sanitized = trimmed;
+  while (/^[=+\-@]/.test(sanitized)) {
+    sanitized = sanitized.substring(1).trim();
+  }
+  return sanitized;
+};
+
 export const Import: React.FC = () => {
   const navigate = useNavigate();
   const { userRole, organization } = useAuth();
@@ -171,13 +184,21 @@ export const Import: React.FC = () => {
 
         // Validation rules
         if (mapping.dbField === 'nom') {
-          if (!value.trim()) {
+          const sanitizedValue = sanitizeFormulaChars(value);
+          if (!sanitizedValue) {
             errors.push({
               line: rowIndex + 2,
               column: mapping.csvColumn,
               message: 'Le nom du dossier est obligatoire',
             });
+          } else {
+            data[mapping.dbField] = sanitizedValue;
           }
+        }
+
+        // Sanitize code field for formula injection
+        if (mapping.dbField === 'code' && value) {
+          data[mapping.dbField] = sanitizeFormulaChars(value);
         }
 
         if (mapping.dbField === 'siren' && value) {
