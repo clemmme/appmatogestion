@@ -1,1 +1,4 @@
 project_id = "ooxzqpetdlurahrmlqyw"
+
+[functions.fiscal-assistant]
+verify_jwt = false

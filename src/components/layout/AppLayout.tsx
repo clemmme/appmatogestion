@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppSidebar } from './AppSidebar';
+import { FiscalAssistant } from '@/components/chat/FiscalAssistant';
 import { Loader2 } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
@@ -28,6 +29,7 @@ export const AppLayout: React.FC = () => {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+      <FiscalAssistant />
     </div>
   );
 };
