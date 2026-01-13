@@ -320,6 +320,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      use_invitation_token: { Args: { token_value: string }; Returns: boolean }
+      validate_invitation_token: {
+        Args: { token_value: string }
+        Returns: {
+          email: string
+          full_name: string
+          organization_name: string
+          profile_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "collaborator"

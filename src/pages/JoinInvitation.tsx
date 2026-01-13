@@ -46,35 +46,21 @@ const JoinInvitation: React.FC = () => {
 
   const validateToken = async () => {
     try {
-      // Query invitation token with profile and organization info
+      // Use secure RPC function to validate token
       const { data, error: tokenError } = await supabase
-        .from('invitation_tokens')
-        .select(`
-          profile_id,
-          profiles!inner(
-            id,
-            full_name,
-            email,
-            organization_id,
-            organizations!inner(name)
-          )
-        `)
-        .eq('token', token)
-        .gt('expires_at', new Date().toISOString())
-        .is('used_at', null)
-        .single();
+        .rpc('validate_invitation_token', { token_value: token })
+        .maybeSingle();
 
       if (tokenError || !data) {
         setError('Ce lien d\'invitation a expiré ou est invalide');
         return;
       }
 
-      const profile = data.profiles as any;
       setInvitation({
-        profile_id: profile.id,
-        full_name: profile.full_name,
-        email: profile.email,
-        organization_name: profile.organizations?.name || 'le cabinet',
+        profile_id: data.profile_id,
+        full_name: data.full_name,
+        email: data.email,
+        organization_name: data.organization_name || 'le cabinet',
       });
     } catch (err) {
       console.error('Token validation error:', err);
@@ -110,11 +96,8 @@ const JoinInvitation: React.FC = () => {
 
       if (signUpError) throw signUpError;
 
-      // Mark token as used
-      await supabase
-        .from('invitation_tokens')
-        .update({ used_at: new Date().toISOString() })
-        .eq('token', token);
+      // Mark token as used via secure RPC function
+      await supabase.rpc('use_invitation_token', { token_value: token });
 
       toast.success('Compte créé avec succès! Bienvenue.');
       navigate('/dashboard', { replace: true });
