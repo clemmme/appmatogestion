@@ -25,6 +25,7 @@ const loginSchema = z.object({
 });
 
 const createCabinetSchema = z.object({
+  cabinetName: z.string().trim().min(2, 'Le nom du cabinet doit contenir au moins 2 caractères'),
   fullName: z.string().trim().min(2, 'Le nom doit contenir au moins 2 caractères'),
   email: z.string().trim().email('Email invalide'),
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
@@ -72,6 +73,7 @@ export const Auth: React.FC = () => {
   const [signupMode, setSignupMode] = useState<'create' | 'join'>('create');
 
   // Form states - Create Cabinet
+  const [createCabinetName, setCreateCabinetName] = useState('');
   const [createFullName, setCreateFullName] = useState('');
   const [createEmail, setCreateEmail] = useState('');
   const [createPassword, setCreatePassword] = useState('');
@@ -173,13 +175,14 @@ export const Auth: React.FC = () => {
 
     try {
       createCabinetSchema.parse({
+        cabinetName: createCabinetName,
         email: createEmail,
         password: createPassword,
         confirmPassword: createConfirmPassword,
         fullName: createFullName,
       });
 
-      const { error } = await signUp(createEmail, createPassword, createFullName);
+      const { error } = await signUp(createEmail, createPassword, createFullName, createCabinetName);
       if (error) {
         if (error.message.includes('already registered')) {
           setError('Cet email est déjà utilisé');
@@ -187,7 +190,8 @@ export const Auth: React.FC = () => {
           setError(error.message);
         }
       } else {
-        setSuccess('Cabinet créé avec succès ! Vous pouvez maintenant vous connecter.');
+        setSuccess('Cabinet créé avec succès ! Vous êtes maintenant Expert (Admin). Vous pouvez vous connecter.');
+        setCreateCabinetName('');
         setCreateEmail('');
         setCreatePassword('');
         setCreateConfirmPassword('');
@@ -387,7 +391,19 @@ export const Auth: React.FC = () => {
               {signupMode === 'create' && (
                 <form onSubmit={handleCreateCabinet} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="create-name">Nom complet</Label>
+                    <Label htmlFor="create-cabinet-name">Nom du Cabinet</Label>
+                    <Input
+                      id="create-cabinet-name"
+                      type="text"
+                      placeholder="Cabinet XYZ"
+                      value={createCabinetName}
+                      onChange={(e) => setCreateCabinetName(e.target.value)}
+                      disabled={loading}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-name">Votre nom complet</Label>
                     <Input
                       id="create-name"
                       type="text"
