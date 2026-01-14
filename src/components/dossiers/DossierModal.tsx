@@ -21,6 +21,7 @@ import type { Dossier, Branch, FormeJuridique, RegimeFiscal, TvaMode } from '@/t
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dossierSchema, validateData } from '@/lib/validation';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DossierModalProps {
   open: boolean;
@@ -40,7 +41,16 @@ export const DossierModal: React.FC<DossierModalProps> = ({
   branches,
   onSave,
 }) => {
+  const { userRole, profile, branch } = useAuth();
   const [loading, setLoading] = useState(false);
+  
+  const isCollaborator = userRole === 'collaborator';
+  
+  // For collaborators, filter branches to only show their own
+  const availableBranches = isCollaborator && branch 
+    ? branches.filter(b => b.id === branch.id) 
+    : branches;
+
   const [formData, setFormData] = useState({
     code: '',
     nom: '',
@@ -67,6 +77,12 @@ export const DossierModal: React.FC<DossierModalProps> = ({
         branch_id: dossier.branch_id,
       });
     } else {
+      // For new dossiers, set default branch
+      // Collaborators get their own branch pre-selected
+      const defaultBranch = isCollaborator && branch 
+        ? branch.id 
+        : availableBranches[0]?.id || '';
+        
       setFormData({
         code: '',
         nom: '',
@@ -76,10 +92,10 @@ export const DossierModal: React.FC<DossierModalProps> = ({
         tva_mode: 'mensuel',
         tva_deadline_day: 21,
         cloture: '',
-        branch_id: branches[0]?.id || '',
+        branch_id: defaultBranch,
       });
     }
-  }, [dossier, branches]);
+  }, [dossier, availableBranches, isCollaborator, branch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +123,7 @@ export const DossierModal: React.FC<DossierModalProps> = ({
     setLoading(true);
 
     try {
-      const data = {
+      const data: any = {
         code: validatedData.code || null,
         nom: validatedData.nom,
         siren: validatedData.siren || null,
@@ -119,6 +135,11 @@ export const DossierModal: React.FC<DossierModalProps> = ({
         branch_id: validatedData.branch_id,
       };
 
+      // For collaborators creating new dossiers, set manager_id to their profile
+      if (!dossier && isCollaborator && profile) {
+        data.manager_id = profile.id;
+      }
+
       if (dossier) {
         const { data: updated, error } = await supabase
           .from('dossiers')
@@ -127,7 +148,10 @@ export const DossierModal: React.FC<DossierModalProps> = ({
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw new Error(`Erreur: ${error.message}${error.details ? ` - ${error.details}` : ''}`);
+        }
         toast.success('Dossier mis à jour');
         onSave(updated as Dossier);
       } else {
@@ -137,13 +161,16 @@ export const DossierModal: React.FC<DossierModalProps> = ({
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          throw new Error(`Erreur: ${error.message}${error.details ? ` - ${error.details}` : ''}`);
+        }
         toast.success('Dossier créé');
         onSave(created as Dossier);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving dossier:', error);
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);
     }
@@ -276,18 +303,24 @@ export const DossierModal: React.FC<DossierModalProps> = ({
             <Select
               value={formData.branch_id}
               onValueChange={(v) => setFormData({ ...formData, branch_id: v })}
+              disabled={isCollaborator} // Collaborators can't change branch
             >
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner..." />
               </SelectTrigger>
               <SelectContent>
-                {branches.map((b) => (
+                {availableBranches.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
                     {b.name} {b.city && `(${b.city})`}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {isCollaborator && (
+              <p className="text-xs text-muted-foreground">
+                Les collaborateurs ne peuvent créer des dossiers que dans leur établissement.
+              </p>
+            )}
           </div>
 
           <DialogFooter>

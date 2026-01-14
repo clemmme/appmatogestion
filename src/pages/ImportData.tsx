@@ -64,7 +64,7 @@ const VALID_TVA_MODES: TvaMode[] = ['mensuel', 'trimestriel'];
 
 const ImportData: React.FC = () => {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  const { userRole, profile, branch } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('');
   const [activeTab, setActiveTab] = useState('paste');
@@ -86,11 +86,19 @@ const ImportData: React.FC = () => {
   
   const [importing, setImporting] = useState(false);
 
+  // All roles can access import now (Collaborator included with restrictions)
   const isExpert = userRole === 'admin' || userRole === 'manager';
+  const isCollaborator = userRole === 'collaborator';
 
   useEffect(() => {
-    fetchBranches();
-  }, []);
+    if (isCollaborator && branch) {
+      // Collaborators can only use their own branch
+      setBranches([branch]);
+      setSelectedBranch(branch.id);
+    } else {
+      fetchBranches();
+    }
+  }, [isCollaborator, branch]);
 
   const fetchBranches = async () => {
     const { data } = await supabase
@@ -183,10 +191,15 @@ const ImportData: React.FC = () => {
         forme_juridique: row.forme_juridique,
         regime_fiscal: row.regime_fiscal,
         branch_id: selectedBranch,
+        // Collaborators must be assigned as manager of their dossiers
+        manager_id: isCollaborator ? profile?.id : null,
       }));
 
       const { error } = await supabase.from('dossiers').insert(dossiers);
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error:', error);
+        throw new Error(error.message || 'Erreur RLS: vérifiez vos permissions');
+      }
 
       toast.success(`${validRows.length} dossiers importés avec succès!`);
       setParsedData([]);
@@ -208,7 +221,7 @@ const ImportData: React.FC = () => {
 
     setImporting(true);
     try {
-      const { error } = await supabase.from('dossiers').insert({
+      const insertData: any = {
         nom: manualDossier.nom.trim(),
         siren: manualDossier.siren.replace(/\s/g, '') || null,
         forme_juridique: manualDossier.forme_juridique,
@@ -216,9 +229,19 @@ const ImportData: React.FC = () => {
         tva_mode: manualDossier.tva_mode,
         cloture: manualDossier.cloture || null,
         branch_id: selectedBranch,
-      });
+      };
 
-      if (error) throw error;
+      // Collaborators must be assigned as manager of their dossiers
+      if (isCollaborator && profile) {
+        insertData.manager_id = profile.id;
+      }
+
+      const { error } = await supabase.from('dossiers').insert(insertData);
+
+      if (error) {
+        console.error('Insert error details:', error);
+        throw new Error(`Erreur: ${error.message}${error.details ? ` - ${error.details}` : ''}`);
+      }
 
       toast.success('Dossier créé avec succès!');
       setManualDossier({
@@ -245,19 +268,8 @@ const ImportData: React.FC = () => {
     }
   };
 
-  if (!isExpert) {
-    return (
-      <div className="p-6">
-        <div className="text-center py-12">
-          <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Accès restreint</h2>
-          <p className="text-muted-foreground">
-            Seuls les experts peuvent importer des dossiers.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Remove access restriction - all roles can import now
+  // Collaborators are restricted by RLS to only create dossiers assigned to themselves
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
