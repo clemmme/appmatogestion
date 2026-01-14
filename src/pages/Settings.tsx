@@ -71,7 +71,7 @@ export const Settings: React.FC = () => {
 
   // UI-only check - Authorization enforced server-side via RLS policies
   // This controls UI visibility only; database operations are protected by has_role() in RLS
-  const isExpert = userRole === 'admin' || userRole === 'manager';
+  // SECURITY FIX: Only ADMIN can manage team/roles - Manager should NOT have access
   const isAdmin = userRole === 'admin';
 
   useEffect(() => {
@@ -81,12 +81,12 @@ export const Settings: React.FC = () => {
         email: profile.email || user?.email || '',
       });
     }
-    if (isExpert) {
+    if (isAdmin) {
       fetchTeamData();
     } else {
       setLoading(false);
     }
-  }, [profile, isExpert, user]);
+  }, [profile, isAdmin, user]);
 
   const copyJoinCode = async () => {
     if (organization?.join_code) {
@@ -338,8 +338,8 @@ export const Settings: React.FC = () => {
         </Card>
       )}
 
-      {/* Team Management (Expert only) */}
-      {isExpert && (
+      {/* Team Management (Admin only - Managers should NOT access this) */}
+      {isAdmin && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
