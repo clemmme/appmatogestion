@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Dossier, Branch, FormeJuridique, RegimeFiscal, TvaMode } from '@/types/database.types';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { dossierSchema, validateData } from '@/lib/validation';
 
 interface DossierModalProps {
   open: boolean;
@@ -82,19 +83,40 @@ export const DossierModal: React.FC<DossierModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form data using Zod schema
+    const validation = validateData(dossierSchema, {
+      code: formData.code || null,
+      nom: formData.nom,
+      siren: formData.siren || null,
+      forme_juridique: formData.forme_juridique,
+      regime_fiscal: formData.regime_fiscal,
+      tva_mode: formData.tva_mode,
+      tva_deadline_day: formData.tva_deadline_day,
+      cloture: formData.cloture || null,
+      branch_id: formData.branch_id,
+    });
+
+    if (!validation.success) {
+      const errorResult = validation as { success: false; error: string };
+      toast.error(errorResult.error);
+      return;
+    }
+
+    const validatedData = validation.data;
     setLoading(true);
 
     try {
       const data = {
-        code: formData.code || null,
-        nom: formData.nom.trim(),
-        siren: formData.siren || null,
-        forme_juridique: formData.forme_juridique,
-        regime_fiscal: formData.regime_fiscal,
-        tva_mode: formData.tva_mode,
-        tva_deadline_day: formData.tva_deadline_day,
-        cloture: formData.cloture || null,
-        branch_id: formData.branch_id,
+        code: validatedData.code || null,
+        nom: validatedData.nom,
+        siren: validatedData.siren || null,
+        forme_juridique: validatedData.forme_juridique,
+        regime_fiscal: validatedData.regime_fiscal,
+        tva_mode: validatedData.tva_mode,
+        tva_deadline_day: validatedData.tva_deadline_day,
+        cloture: validatedData.cloture || null,
+        branch_id: validatedData.branch_id,
       };
 
       if (dossier) {
@@ -126,7 +148,6 @@ export const DossierModal: React.FC<DossierModalProps> = ({
       setLoading(false);
     }
   };
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
