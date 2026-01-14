@@ -161,6 +161,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          join_code: string
           name: string
           subscription_status: string | null
           updated_at: string
@@ -168,6 +169,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          join_code: string
           name: string
           subscription_status?: string | null
           updated_at?: string
@@ -175,6 +177,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          join_code?: string
           name?: string
           subscription_status?: string | null
           updated_at?: string
@@ -312,6 +315,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_unique_join_code: { Args: never; Returns: string }
+      get_organization_branches: {
+        Args: { org_id: string }
+        Returns: {
+          branch_city: string
+          branch_id: string
+          branch_name: string
+        }[]
+      }
       get_user_organization_id: { Args: { user_uuid: string }; Returns: string }
       has_role: {
         Args: {
@@ -319,6 +331,22 @@ export type Database = {
           user_uuid: string
         }
         Returns: boolean
+      }
+      lookup_organization_by_code: {
+        Args: { code: string }
+        Returns: {
+          organization_id: string
+          organization_name: string
+        }[]
+      }
+      register_with_join_code: {
+        Args: {
+          p_branch_id: string
+          p_email: string
+          p_full_name: string
+          p_join_code: string
+        }
+        Returns: string
       }
       use_invitation_token: { Args: { token_value: string }; Returns: boolean }
       validate_invitation_token: {

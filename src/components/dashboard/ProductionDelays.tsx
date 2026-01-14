@@ -1,8 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, ArrowRight } from 'lucide-react';
-import type { TacheFiscale, Dossier } from '@/types/database.types';
+import { Badge } from '@/components/ui/badge';
+import { AlertTriangle, ArrowRight, User } from 'lucide-react';
+import type { TacheFiscale, Dossier, Profile } from '@/types/database.types';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -10,12 +11,14 @@ import { cn } from '@/lib/utils';
 interface ProductionDelaysProps {
   lateTasks: TacheFiscale[];
   dossierMap: Map<string, Dossier>;
+  collaboratorsMap?: Map<string, Profile>;
   onTaskClick: (task: TacheFiscale) => void;
 }
 
 export const ProductionDelays: React.FC<ProductionDelaysProps> = ({
   lateTasks,
   dossierMap,
+  collaboratorsMap,
   onTaskClick,
 }) => {
   if (lateTasks.length === 0) {
@@ -58,16 +61,23 @@ export const ProductionDelays: React.FC<ProductionDelaysProps> = ({
                 )}
                 onClick={() => onTaskClick(task)}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-status-urgent/10 flex items-center justify-center">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-status-urgent/10 flex items-center justify-center shrink-0">
                     <span className="text-xs font-bold text-status-urgent">{task.type}</span>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">{dossier.nom}</p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{dossier.nom}</p>
+                    <p className="text-xs text-muted-foreground truncate">
                       {task.commentaire || `${task.type} - ${format(dueDate, 'MMM yyyy', { locale: fr })}`}
                     </p>
                   </div>
+                  {/* Responsable badge */}
+                  {dossier.manager_id && collaboratorsMap && (
+                    <Badge variant="outline" className="shrink-0 gap-1 text-xs">
+                      <User className="w-3 h-3" />
+                      {collaboratorsMap.get(dossier.manager_id)?.full_name?.split(' ')[0] || 'N/A'}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">

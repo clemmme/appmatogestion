@@ -32,9 +32,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Settings as SettingsIcon, User, Shield, Trash2, Loader2, Building2, Users } from 'lucide-react';
+import { Settings as SettingsIcon, User, Shield, Trash2, Loader2, Building2, Users, Key, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Profile, Branch, AppRole } from '@/types/database.types';
+import type { Profile, Branch, AppRole, Organization } from '@/types/database.types';
 
 interface TeamMember extends Profile {
   role?: AppRole;
@@ -63,6 +63,7 @@ export const Settings: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [profileData, setProfileData] = useState({
     full_name: '',
     email: '',
@@ -71,6 +72,7 @@ export const Settings: React.FC = () => {
   // UI-only check - Authorization enforced server-side via RLS policies
   // This controls UI visibility only; database operations are protected by has_role() in RLS
   const isExpert = userRole === 'admin' || userRole === 'manager';
+  const isAdmin = userRole === 'admin';
 
   useEffect(() => {
     if (profile) {
@@ -85,6 +87,15 @@ export const Settings: React.FC = () => {
       setLoading(false);
     }
   }, [profile, isExpert, user]);
+
+  const copyJoinCode = async () => {
+    if (organization?.join_code) {
+      await navigator.clipboard.writeText(organization.join_code);
+      setCodeCopied(true);
+      toast.success('Code cabinet copié !');
+      setTimeout(() => setCodeCopied(false), 2000);
+    }
+  };
 
   const fetchTeamData = async () => {
     setLoading(true);
@@ -283,6 +294,49 @@ export const Settings: React.FC = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Join Code Section (Admin only) */}
+      {isAdmin && organization?.join_code && (
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-primary" />
+              Code Cabinet
+            </CardTitle>
+            <CardDescription>
+              Partagez ce code avec vos collaborateurs pour qu'ils rejoignent votre cabinet
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 bg-muted rounded-lg px-6 py-4 font-mono text-2xl font-bold tracking-widest text-center">
+                {organization.join_code}
+              </div>
+              <Button 
+                onClick={copyJoinCode} 
+                size="lg"
+                variant={codeCopied ? "secondary" : "default"}
+                className="gap-2"
+              >
+                {codeCopied ? (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Copié !
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-5 h-5" />
+                    Copier
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mt-4">
+              Les nouveaux collaborateurs pourront s'inscrire avec ce code depuis la page de connexion.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Team Management (Expert only) */}
       {isExpert && (
