@@ -17,6 +17,71 @@ const SYSTEM_PROMPT = `Tu es un assistant fiscal expert pour les experts-comptab
 Réponds de manière claire, concise et professionnelle. Si tu n'es pas sûr d'une information, indique-le clairement.
 Utilise des exemples concrets quand c'est pertinent. Formate tes réponses avec des listes à puces quand approprié.`;
 
+// Input validation constants
+const MAX_MESSAGES = 50;
+const MAX_MESSAGE_LENGTH = 4000;
+const VALID_ROLES = ['user', 'assistant'];
+
+// Message validation schema
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+function validateMessages(messages: unknown): { valid: true; messages: ChatMessage[] } | { valid: false; error: string } {
+  if (!messages || !Array.isArray(messages)) {
+    return { valid: false, error: "Messages array is required" };
+  }
+
+  if (messages.length === 0) {
+    return { valid: false, error: "Messages array cannot be empty" };
+  }
+
+  if (messages.length > MAX_MESSAGES) {
+    return { valid: false, error: `Too many messages. Maximum allowed: ${MAX_MESSAGES}` };
+  }
+
+  const validatedMessages: ChatMessage[] = [];
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    
+    if (!msg || typeof msg !== 'object') {
+      return { valid: false, error: `Message at index ${i} is invalid` };
+    }
+
+    const { role, content } = msg as Record<string, unknown>;
+
+    // Validate role
+    if (!role || typeof role !== 'string' || !VALID_ROLES.includes(role)) {
+      return { valid: false, error: `Invalid role at message ${i}. Must be 'user' or 'assistant'` };
+    }
+
+    // Validate content
+    if (content === undefined || content === null || typeof content !== 'string') {
+      return { valid: false, error: `Invalid content at message ${i}. Must be a string` };
+    }
+
+    if (content.length === 0) {
+      return { valid: false, error: `Message at index ${i} cannot have empty content` };
+    }
+
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      return { valid: false, error: `Message at index ${i} exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` };
+    }
+
+    // Sanitize content - remove control characters
+    const sanitizedContent = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    validatedMessages.push({
+      role: role as 'user' | 'assistant',
+      content: sanitizedContent,
+    });
+  }
+
+  return { valid: true, messages: validatedMessages };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -53,11 +118,30 @@ serve(async (req) => {
     const userId = user.id;
     console.log("Authenticated user:", userId);
 
-    const { messages } = await req.json();
-    
-    if (!messages || !Array.isArray(messages)) {
-      throw new Error("Messages array is required");
+    // Parse and validate request body
+    let requestBody: unknown;
+    try {
+      requestBody = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+
+    const { messages: rawMessages } = requestBody as Record<string, unknown>;
+    
+    // Validate messages with strict schema
+    const validation = validateMessages(rawMessages);
+    if (!validation.valid) {
+      console.error("Message validation failed:", validation.error);
+      return new Response(JSON.stringify({ error: validation.error }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const messages = validation.messages;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -65,7 +149,7 @@ serve(async (req) => {
       throw new Error("AI service is not configured");
     }
 
-    console.log("Calling Lovable AI Gateway with", messages.length, "messages for user", userId);
+    console.log("Calling Lovable AI Gateway with", messages.length, "validated messages for user", userId);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -80,6 +164,7 @@ serve(async (req) => {
           ...messages,
         ],
         stream: true,
+        max_tokens: 2048, // Limit response tokens for cost control
       }),
     });
 
@@ -112,7 +197,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Fiscal assistant error:", error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "Une erreur est survenue" 
+      error: "Une erreur est survenue lors du traitement de votre demande" 
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

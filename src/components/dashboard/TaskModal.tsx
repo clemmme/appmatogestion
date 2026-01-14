@@ -24,6 +24,7 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { taskSchema, validateData, sanitizeText } from '@/lib/validation';
 
 interface TaskModalProps {
   open: boolean;
@@ -60,9 +61,26 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
+    // Validate task data
+    const parsedMontant = montant ? parseFloat(montant) : null;
+    
+    const validation = validateData(taskSchema, {
+      statut,
+      montant: parsedMontant,
+      commentaire: commentaire || null,
+    });
+
+    if (!validation.success) {
+      const errorResult = validation as { success: false; error: string };
+      toast.error(errorResult.error);
+      return;
+    }
+
+    const validatedData = validation.data;
     setLoading(true);
     try {
       const dateEcheance = `${month}-15`; // Mid-month as default
+      const sanitizedComment = validatedData.commentaire || null;
 
       if (task) {
         // Update existing task
@@ -70,8 +88,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           .from('taches_fiscales')
           .update({
             statut,
-            montant: montant ? parseFloat(montant) : null,
-            commentaire: commentaire || null,
+            montant: parsedMontant,
+            commentaire: sanitizedComment || null,
             completed_at: statut === 'fait' ? new Date().toISOString() : null,
           })
           .eq('id', task.id)
@@ -90,8 +108,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             type: taskType,
             date_echeance: dateEcheance,
             statut,
-            montant: montant ? parseFloat(montant) : null,
-            commentaire: commentaire || null,
+            montant: parsedMontant,
+            commentaire: sanitizedComment || null,
             completed_at: statut === 'fait' ? new Date().toISOString() : null,
           })
           .select()
@@ -108,7 +126,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setLoading(false);
     }
   };
-
   const formatMonth = (month: string) => {
     try {
       const date = parseISO(`${month}-01`);

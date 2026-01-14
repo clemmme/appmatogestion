@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Edit, Trash2, Building2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Branch } from '@/types/database.types';
+import { branchSchema, validateData } from '@/lib/validation';
 
 export const Branches: React.FC = () => {
   const { organization, userRole } = useAuth();
@@ -71,11 +72,20 @@ export const Branches: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation
-    if (!formData.name.trim()) {
-      toast.error('Le nom de l\'établissement est obligatoire');
+    // Validate form data using Zod schema
+    const validation = validateData(branchSchema, {
+      name: formData.name,
+      city: formData.city || null,
+    });
+
+    if (!validation.success) {
+      const errorResult = validation as { success: false; error: string };
+      toast.error(errorResult.error);
       return;
     }
+
+    const validatedName = validation.data.name;
+    const validatedCity = validation.data.city;
     
     if (!organization?.id) {
       toast.error('Erreur : Organisation non trouvée. Veuillez vous reconnecter.');
@@ -84,12 +94,13 @@ export const Branches: React.FC = () => {
 
     setSaving(true);
     try {
+
       if (editingBranch) {
         const { data, error } = await supabase
           .from('branches')
           .update({
-            name: formData.name.trim(),
-            city: formData.city.trim() || null,
+            name: validatedName,
+            city: validatedCity || null,
           })
           .eq('id', editingBranch.id)
           .select()
@@ -107,8 +118,8 @@ export const Branches: React.FC = () => {
         const { data, error } = await supabase
           .from('branches')
           .insert({
-            name: formData.name.trim(),
-            city: formData.city.trim() || null,
+            name: validatedName,
+            city: validatedCity || null,
             organization_id: organization.id,
           })
           .select()
@@ -134,7 +145,6 @@ export const Branches: React.FC = () => {
       setSaving(false);
     }
   };
-
   const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet établissement ? Les dossiers associés seront également affectés.')) return;
 
