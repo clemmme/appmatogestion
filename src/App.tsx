@@ -15,9 +15,7 @@ import Dossiers from "./pages/Dossiers";
 import DossierDetail from "./pages/DossierDetail";
 import Import from "./pages/Import";
 import ImportData from "./pages/ImportData";
-import JoinInvitation from "./pages/JoinInvitation";
 import Branches from "./pages/Branches";
-import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -36,7 +34,6 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/join" element={<JoinInvitation />} />
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dossiers" element={<Dossiers />} />
@@ -44,7 +41,6 @@ const App = () => (
                 <Route path="/import" element={<Import />} />
                 <Route path="/import-data" element={<ImportData />} />
                 <Route path="/branches" element={<Branches />} />
-                <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />

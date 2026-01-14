@@ -6,7 +6,6 @@ import {
   Upload,
   Settings,
   Building2,
-  Users,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
@@ -34,7 +33,6 @@ const mainNavItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
   { label: 'Établissements', icon: Building2, href: '/branches' },
-  { label: 'Utilisateurs', icon: Users, href: '/users' },
   { label: 'Paramètres', icon: Settings, href: '/settings' },
 ];
 

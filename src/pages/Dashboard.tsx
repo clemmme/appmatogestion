@@ -159,6 +159,10 @@ export const Dashboard: React.FC = () => {
     return new Map(dossiers.map(d => [d.id, d]));
   }, [dossiers]);
 
+  const collaboratorsMap = useMemo(() => {
+    return new Map(collaborators.map(c => [c.id, c]));
+  }, [collaborators]);
+
   const getFilteredTasks = (types: TacheType[]) => {
     const dossierIds = new Set(dossiers.map(d => d.id));
     return taches
@@ -257,6 +261,9 @@ export const Dashboard: React.FC = () => {
             <thead>
               <tr className="bg-muted/50">
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Dossier</th>
+                {isExpert && (
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Responsable</th>
+                )}
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Type</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Échéance</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Délai</th>
@@ -318,6 +325,24 @@ export const Dashboard: React.FC = () => {
                         <p className="text-xs text-muted-foreground">{dossier.forme_juridique}</p>
                       </div>
                     </td>
+                    {isExpert && (
+                      <td className="px-4 py-3">
+                        {dossier.manager_id ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-xs font-medium text-primary">
+                                {collaboratorsMap.get(dossier.manager_id)?.full_name?.charAt(0) || '?'}
+                              </span>
+                            </div>
+                            <span className="text-sm">
+                              {collaboratorsMap.get(dossier.manager_id)?.full_name?.split(' ')[0] || '—'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Non assigné</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-sm">{task.type}</td>
                     <td className="px-4 py-3 text-sm">
                       {format(dueDate, 'd MMM yyyy', { locale: fr })}
@@ -438,6 +463,7 @@ export const Dashboard: React.FC = () => {
       <ProductionDelays
         lateTasks={lateTasks}
         dossierMap={dossierMap}
+        collaboratorsMap={isExpert ? collaboratorsMap : undefined}
         onTaskClick={openTaskModal}
       />
 
