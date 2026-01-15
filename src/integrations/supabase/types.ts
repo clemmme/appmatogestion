@@ -289,6 +289,71 @@ export type Database = {
           },
         ]
       }
+      tva_history: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          credit: number | null
+          dossier_id: string
+          id: string
+          montant: number | null
+          note: string | null
+          period: string
+          step_calcul_envoye: boolean | null
+          step_compta_recue: boolean | null
+          step_dossier_revise: boolean | null
+          step_saisie_faite: boolean | null
+          step_teletransmis: boolean | null
+          step_valide: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          credit?: number | null
+          dossier_id: string
+          id?: string
+          montant?: number | null
+          note?: string | null
+          period: string
+          step_calcul_envoye?: boolean | null
+          step_compta_recue?: boolean | null
+          step_dossier_revise?: boolean | null
+          step_saisie_faite?: boolean | null
+          step_teletransmis?: boolean | null
+          step_valide?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          credit?: number | null
+          dossier_id?: string
+          id?: string
+          montant?: number | null
+          note?: string | null
+          period?: string
+          step_calcul_envoye?: boolean | null
+          step_compta_recue?: boolean | null
+          step_dossier_revise?: boolean | null
+          step_saisie_faite?: boolean | null
+          step_teletransmis?: boolean | null
+          step_valide?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tva_history_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: false
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
