@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { Profile, UserRole, Organization, Branch, AppRole } from '@/types/database.types';
+import type { Profile, Organization, Branch, AppRole } from '@/types/database.types';
 
 interface AuthContextType {
   user: User | null;
@@ -37,17 +37,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch profile
-      const { data: profileData } = await supabase
+      // 1. Fetch profile
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
 
+      if (profileError) console.error('Error fetching profile:', profileError);
+
       if (profileData) {
         setProfile(profileData as Profile);
 
-        // Fetch organization
+        // 2. Fetch organization
         if (profileData.organization_id) {
           const { data: orgData } = await supabase
             .from('organizations')
@@ -57,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setOrganization(orgData as Organization);
         }
 
-        // Fetch branch
+        // 3. Fetch branch
         if (profileData.branch_id) {
           const { data: branchData } = await supabase
             .from('branches')
@@ -68,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fetch role
+      // 4. Fetch role
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
@@ -77,6 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (roleData) {
         setUserRole(roleData.role as AppRole);
+      } else {
+        // Fallback: Si pas de rôle trouvé mais qu'il y a une organisation, c'est louche.
+        setUserRole(null);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -84,17 +89,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Defer data fetching to avoid deadlock
+          // Petit délai pour laisser le temps aux triggers DB éventuels
           setTimeout(() => {
             fetchUserData(session.user.id);
-          }, 0);
+          }, 500);
         } else {
           setProfile(null);
           setUserRole(null);
@@ -105,7 +109,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -126,22 +129,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
+  // 🔴 CORRECTION MAJEURE ICI : Création explicite des données
   const signUp = async (email: string, password: string, fullName: string, cabinetName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    // 1. Création du compte Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
-          signup_mode: 'create',
-          cabinet_name: cabinetName || fullName,
+          // On garde les métadonnées au cas où, mais on ne compte plus dessus
+          cabinet_name: cabinetName || fullName, 
         },
       },
     });
-    return { error: error as Error | null };
+
+    if (authError || !authData.user) {
+      return { error: authError as Error | null };
+    }
+
+    // 2. Si un nom de cabinet est fourni, on force la création des données relationnelles
+    // On attend un peu que l'utilisateur soit bien propagé en base
+    if (cabinetName) {
+      try {
+        // A. Créer l'organisation manuellement
+        const { data: newOrg, error: orgError } = await supabase
+          .from('organizations')
+          .insert([{ name: cabinetName }])
+          .select()
+          .single();
+
+        if (orgError) throw orgError;
+
+        if (newOrg) {
+          // B. Attribuer le rôle OWNER (C'est ça qui te manquait !)
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: authData.user.id,
+              role: 'owner', // Force le rôle OWNER
+              organization_id: newOrg.id
+            });
+            
+          if (roleError) console.error("Erreur création rôle:", roleError);
+
+          // C. Lier le profil à l'organisation
+          // Note : Le profil est souvent créé par un trigger "on_auth_user_created". 
+          // On fait un UPDATE pour être sûr.
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ 
+              organization_id: newOrg.id,
+              full_name: fullName
+            })
+            .eq('user_id', authData.user.id);
+
+          // Si le profil n'existe pas encore (lag du trigger), on tente un upsert
+          if (profileError) {
+             await supabase.from('profiles').upsert({
+                user_id: authData.user.id,
+                organization_id: newOrg.id,
+                full_name: fullName,
+                email: email
+             });
+          }
+        }
+      } catch (err) {
+        console.error("Erreur lors de l'initialisation du cabinet:", err);
+        // On ne bloque pas le signup, mais l'user devra contacter le support ou réessayer
+      }
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
