@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -12,12 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Building2, Calendar, Save, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, Save, RefreshCw, ListChecks, Table } from 'lucide-react';
 import type { Dossier, TacheFiscale, TacheType, TacheStatut } from '@/types/database.types';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { TVAWorkflowGrid } from '@/components/tva/TVAWorkflowGrid';
 
 type YearMonth = string; // Format: YYYY-MM
 
@@ -265,12 +267,36 @@ export const DossierDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Annual Grid */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Fiche de travail {selectedYear}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Tabs for different views */}
+      <Tabs defaultValue="workflow" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="workflow" className="flex items-center gap-2">
+            <ListChecks className="w-4 h-4" />
+            TVA Workflow
+          </TabsTrigger>
+          <TabsTrigger value="grid" className="flex items-center gap-2">
+            <Table className="w-4 h-4" />
+            Grille classique
+          </TabsTrigger>
+        </TabsList>
+
+        {/* New TVA Workflow Tab */}
+        <TabsContent value="workflow">
+          <TVAWorkflowGrid
+            dossierId={id!}
+            tvaMode={dossier.tva_mode}
+            year={selectedYear}
+            onYearChange={setSelectedYear}
+          />
+        </TabsContent>
+
+        {/* Classic Grid Tab */}
+        <TabsContent value="grid">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Fiche de travail {selectedYear}</CardTitle>
+            </CardHeader>
+            <CardContent>
           <div className="overflow-x-auto">
             {/* TVA Grid - Monthly */}
             <h3 className="text-sm font-semibold text-muted-foreground mb-2">TVA (Mensuel/Trimestriel)</h3>
@@ -493,10 +519,10 @@ export const DossierDetail: React.FC = () => {
               Les tâches sont créées automatiquement à la création du dossier.
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Legend */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       <div className="flex flex-wrap gap-4 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-status-urgent/15 border border-status-urgent/30" />
