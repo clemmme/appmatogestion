@@ -153,55 +153,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Si un nom de cabinet est fourni, on force la création des données relationnelles
     // On attend un peu que l'utilisateur soit bien propagé en base
-    if (cabinetName) {
-      try {
-        // A. Créer l'organisation manuellement
-        const { data: newOrg, error: orgError } = await supabase
-          .from('organizations')
-          .insert([{ name: cabinetName }])
-          .select()
-          .single();
-
-        if (orgError) throw orgError;
-
-        if (newOrg) {
-          // B. Attribuer le rôle OWNER (C'est ça qui te manquait !)
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: authData.user.id,
-              role: 'owner', // Force le rôle OWNER
-              organization_id: newOrg.id
-            });
-            
-          if (roleError) console.error("Erreur création rôle:", roleError);
-
-          // C. Lier le profil à l'organisation
-          // Note : Le profil est souvent créé par un trigger "on_auth_user_created". 
-          // On fait un UPDATE pour être sûr.
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({ 
-              organization_id: newOrg.id,
-              full_name: fullName
-            })
-            .eq('user_id', authData.user.id);
-
-          // Si le profil n'existe pas encore (lag du trigger), on tente un upsert
-          if (profileError) {
-             await supabase.from('profiles').upsert({
-                user_id: authData.user.id,
-                organization_id: newOrg.id,
-                full_name: fullName,
-                email: email
-             });
-          }
-        }
-      } catch (err) {
-        console.error("Erreur lors de l'initialisation du cabinet:", err);
-        // On ne bloque pas le signup, mais l'user devra contacter le support ou réessayer
-      }
-    }
+    // Note: Le trigger handle_new_user gère automatiquement la création de l'organisation,
+    // du profil et du rôle admin. Pas besoin de logique supplémentaire ici.
+    // Le cabinetName est passé dans les metadata et sera utilisé par le trigger.
 
     return { error: null };
   };
