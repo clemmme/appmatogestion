@@ -31,8 +31,8 @@ const mainNavItems: NavItem[] = [
   { label: 'Import', icon: Upload, href: '/import' },
 ];
 
+// SINGLE PLAYER MODE: Administration simplifiée (équipe masquée)
 const adminNavItems: NavItem[] = [
-  { label: 'Établissements', icon: Building2, href: '/branches' },
   { label: 'Paramètres', icon: Settings, href: '/settings' },
 ];
 
